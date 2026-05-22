@@ -27,6 +27,7 @@ import logging
 import os
 import shutil
 import sys
+import subprocess
 import json
 import re
 import concurrent.futures
@@ -99,6 +100,27 @@ from hermes_cli.banner import _format_context_length, format_banner_version_labe
 
 _COMMAND_SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
 
+
+def _play_notification_sound(kind: str = "alert") -> None:
+    """Play terminal bell + paplay sound. Swallows all errors."""
+    try:
+        os.write(sys.__stdout__.fileno(), b"\x07")
+        sys.__stdout__.flush()
+    except Exception:
+        pass
+    if sys.platform.startswith("linux"):
+        try:
+            candidates = [
+                "/usr/share/sounds/freedesktop/stereo/bell.oga",
+                "/usr/share/sounds/alsa/Front_Left.wav",
+            ]
+            for path in candidates:
+                if os.path.exists(path):
+                    cmd = ["paplay" if path.endswith(".oga") else "aplay", path]
+                    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    break
+        except Exception:
+            pass
 
 # Load .env from ~/.hermes/.env first, then project root as dev fallback.
 # User-managed env files should override stale shell exports on restart.
@@ -8419,8 +8441,7 @@ class HermesCLI:
 
                 # Play bell if enabled
                 if self.bell_on_complete:
-                    sys.stdout.write("\a")
-                    sys.stdout.flush()
+                    _play_notification_sound("done")
 
             except Exception as e:
                 # Same TUI refresh pattern as success path (#2718)
@@ -10682,6 +10703,7 @@ class HermesCLI:
                 "selected": 0,
                 "response_queue": response_queue,
             }
+            _play_notification_sound("alert")
             self._approval_deadline = _time.monotonic() + timeout
 
             self._invalidate()
@@ -10691,6 +10713,7 @@ class HermesCLI:
                 try:
                     result = response_queue.get(timeout=1)
                     self._approval_state = None
+                    _play_notification_sound("alert")
                     self._approval_deadline = 0
                     self._invalidate()
                     return result
@@ -10706,6 +10729,7 @@ class HermesCLI:
             self._approval_state = None
             self._approval_deadline = 0
             self._invalidate()
+            _play_notification_sound("alert")
             _cprint(f"\n{_DIM}  ⏱ Timeout — denying command{_RST}")
             return "deny"
 
@@ -11505,8 +11529,7 @@ class HermesCLI:
             # Play terminal bell when agent finishes (if enabled).
             # Works over SSH — the bell propagates to the user's terminal.
             if self.bell_on_complete:
-                sys.stdout.write("\a")
-                sys.stdout.flush()
+                _play_notification_sound("done")
 
             # Notify when iteration budget was hit
             if result and not result.get("completed") and not result.get("interrupted"):
