@@ -3525,6 +3525,7 @@ class HermesCLI:
             "session_api_calls": 0,
             "compressions": 0,
             "active_background_tasks": 0,
+            "active_background_processes": 0,
         }
 
         # Count live /background tasks. The dict entry is removed in the
@@ -3534,6 +3535,14 @@ class HermesCLI:
             bg_tasks = getattr(self, "_background_tasks", None)
             if bg_tasks:
                 snapshot["active_background_tasks"] = len(bg_tasks)
+        except Exception:
+            pass
+
+        # Count live background terminal processes (terminal tool background
+        # sessions tracked by tools.process_registry). Cheap O(1) read.
+        try:
+            from tools.process_registry import process_registry
+            snapshot["active_background_processes"] = process_registry.count_running()
         except Exception:
             pass
 
@@ -3775,6 +3784,9 @@ class HermesCLI:
                 bg_count = snapshot.get("active_background_tasks", 0)
                 if bg_count:
                     parts.append(f"▶ {bg_count}")
+                bg_proc_count = snapshot.get("active_background_processes", 0)
+                if bg_proc_count:
+                    parts.append(f"⚙ {bg_proc_count}")
                 parts.append(duration_label)
                 if yolo_active:
                     parts.append("⚠ YOLO")
@@ -3794,6 +3806,9 @@ class HermesCLI:
             bg_count = snapshot.get("active_background_tasks", 0)
             if bg_count:
                 parts.append(f"▶ {bg_count}")
+            bg_proc_count = snapshot.get("active_background_processes", 0)
+            if bg_proc_count:
+                parts.append(f"⚙ {bg_proc_count}")
             parts.append(duration_label)
             prompt_elapsed = snapshot.get("prompt_elapsed")
             if prompt_elapsed:
@@ -3835,6 +3850,7 @@ class HermesCLI:
                 if width < 76:
                     compressions = snapshot.get("compressions", 0)
                     bg_count = snapshot.get("active_background_tasks", 0)
+                    bg_proc_count = snapshot.get("active_background_processes", 0)
                     frags = [
                         ("class:status-bar", " ⚕ "),
                         ("class:status-bar-strong", snapshot["model_short"]),
@@ -3847,6 +3863,9 @@ class HermesCLI:
                     if bg_count:
                         frags.append(("class:status-bar-dim", " · "))
                         frags.append(("class:status-bar-strong", f"▶ {bg_count}"))
+                    if bg_proc_count:
+                        frags.append(("class:status-bar-dim", " · "))
+                        frags.append(("class:status-bar-strong", f"⚙ {bg_proc_count}"))
                     frags.extend([
                         ("class:status-bar-dim", " · "),
                         ("class:status-bar-dim", duration_label),
@@ -3866,6 +3885,7 @@ class HermesCLI:
                     bar_style = self._status_bar_context_style(percent)
                     compressions = snapshot.get("compressions", 0)
                     bg_count = snapshot.get("active_background_tasks", 0)
+                    bg_proc_count = snapshot.get("active_background_processes", 0)
                     frags = [
                         ("class:status-bar", " ⚕ "),
                         ("class:status-bar-strong", snapshot["model_short"]),
@@ -3882,6 +3902,9 @@ class HermesCLI:
                     if bg_count:
                         frags.append(("class:status-bar-dim", " │ "))
                         frags.append(("class:status-bar-strong", f"▶ {bg_count}"))
+                    if bg_proc_count:
+                        frags.append(("class:status-bar-dim", " │ "))
+                        frags.append(("class:status-bar-strong", f"⚙ {bg_proc_count}"))
                     frags.extend([
                         ("class:status-bar-dim", " │ "),
                         ("class:status-bar-dim", duration_label),
